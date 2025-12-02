@@ -50,6 +50,21 @@ class MinetestMonitor:
             'farming:seed_',       # Seeds (wheat, cotton, etc.)
             'farming:cotton_',     # Cotton plant stages
             'farming:wheat_',      # Wheat plant stages
+            'farming:beetroot',    # Beetroot
+            'farming:onion',       # Onion
+            'farming:carrot',      # Carrot
+            'farming:potato',      # Potato
+            'farming:tomato',      # Tomato
+            'farming:cucumber',    # Cucumber
+            'farming:corn',        # Corn
+            'farming:coffee',      # Coffee
+            'farming:melon',       # Melon
+            'farming:pumpkin',     # Pumpkin
+            'farming:raspberry',   # Raspberry
+            'farming:blueberry',   # Blueberry
+            'farming:rhubarb',     # Rhubarb
+            'farming:beans',       # Beans
+            'farming:grapes',      # Grapes
             'default:sapling',     # Tree saplings
             'default:bush_sapling',# Bush saplings
             'default:pine_sapling',
@@ -211,7 +226,7 @@ class MinetestMonitor:
                     print("[+] {} dug dirt! Total: {}".format(player, self.stats[player]['dirt_dug']))
                 return True
         
-        # Pattern for placing actions - ONLY count "places node" for farming
+        # Pattern for placing actions - "places node"
         place_pattern = r'ACTION\[Server\]: (\w+) places node ([\w:]+) at'
         place_match = re.search(place_pattern, line)
         
@@ -226,6 +241,23 @@ class MinetestMonitor:
                 self.stats[player]['farming_placed'] += 1
                 if verbose:
                     print("[+] {} placed {}! Total farming: {}".format(player, block, self.stats[player]['farming_placed']))
+                return True
+        
+        # Pattern for planting actions - "planted" (alternative farming log format)
+        plant_pattern = r'ACTION\[Server\]: (\w+) planted ([\w:]+)'
+        plant_match = re.search(plant_pattern, line)
+        
+        if plant_match:
+            player = plant_match.group(1)
+            block = plant_match.group(2)
+            
+            self.init_player(player)
+            
+            # Check if it's a farming/planting related item
+            if self.is_farming_related(block):
+                self.stats[player]['farming_placed'] += 1
+                if verbose:
+                    print("[+] {} planted {}! Total farming: {}".format(player, block, self.stats[player]['farming_placed']))
                 return True
         
         return False
