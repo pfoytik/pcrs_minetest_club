@@ -2,12 +2,15 @@
 import re
 import time
 import json
+from collections import defaultdict
 
 class MinetestDeathTracker:
     def __init__(self, log_file_path, stats_file='minetest_deaths.json'):
         self.log_file_path = log_file_path
         self.stats_file = stats_file
         self.stats = self.load_stats()
+        # Track recent damage for each player to determine death cause
+        self.recent_damage = {}
     
     def load_stats(self):
         """Load existing death stats from file or create new."""
@@ -30,13 +33,117 @@ class MinetestDeathTracker:
                 'death_causes': {}
             }
     
+    def extract_damage_info(self, line):
+        """Extract damage information from damage log lines."""
+        # Pattern 1: "ACTION[Server]: player damaged by X hp at (coords)"
+        damage_pattern = r'ACTION\[Server\]: (\w+) damaged by (\d+) hp'
+        match = re.search(damage_pattern, line)
+        
+        if match:
+            player = match.group(1)
+            damage = int(match.group(2))
+            
+            # Try to determine damage type from the line or context
+            cause = self.determine_damage_cause(line, damage)
+            
+            # Store recent damage for this player
+            self.recent_damage[player] = cause
+            
+            return player, damage, cause
+        
+        # Pattern 2: "LuaEntitySAO ... punched player X"
+        punch_pattern = r'punched player (\w+).*damage=(\d+)'
+        match = re.search(punch_pattern, line)
+        
+        if match:
+            player = match.group(1)
+            damage = int(match.group(2))
+            
+            # Determine what punched the player
+            cause = self.determine_punch_cause(line)
+            
+            # Store recent damage for this player
+            self.recent_damage[player] = cause
+            
+            return player, damage, cause
+        
+        return None, None, None
+    
+    def determine_punch_cause(self, line):
+        """Determine the cause when player is punched by an entity."""
+        # Extract entity name from the line
+        entity_pattern = r'LuaEntitySAO "([^"]+)"'
+        match = re.search(entity_pattern, line)
+        
+        if match:
+            entity = match.group(1)
+            
+            # Check for specific mob types
+            if 'arrow' in entity.lower():
+                return 'Arrow/Projectile'
+            elif 'monster' in entity.lower():
+                return 'Monster'
+            elif 'zombie' in entity.lower():
+                return 'Zombie'
+            elif 'spider' in entity.lower():
+                return 'Spider'
+            elif 'skeleton' in entity.lower():
+                return 'Skeleton'
+            elif 'creeper' in entity.lower():
+                return 'Creeper'
+            elif 'slime' in entity.lower():
+                return 'Slime'
+            else:
+                # Return the entity type if it's not recognized
+                return 'Mob ({})'.format(entity.split(':')[-1] if ':' in entity else entity)
+        
+        # Check if another player punched them
+        if 'punched player' in line:
+            return 'Player Attack'
+        
+        return 'Mob/Entity'
+    
+    def determine_damage_cause(self, line, damage):
+        """Determine the cause of damage based on context."""
+        # Check for specific keywords in the damage line
+        line_lower = line.lower()
+        
+        # Very high damage usually indicates fall
+        if damage >= 15:
+            return 'Fall Damage'
+        
+        # Check for specific keywords
+        if 'drown' in line_lower:
+            return 'Drowning'
+        elif 'lava' in line_lower:
+            return 'Lava'
+        elif 'fire' in line_lower or 'burn' in line_lower:
+            return 'Fire'
+        elif 'suffocate' in line_lower or 'suffocation' in line_lower:
+            return 'Suffocation'
+        elif 'punch' in line_lower or 'mob' in line_lower:
+            return 'Mob/Player'
+        
+        # Medium-high damage (10-14) is likely fall
+        elif damage >= 10:
+            return 'Fall Damage'
+        
+        # Low damage could be drowning, fire, or environmental
+        elif damage <= 3:
+            return 'Environmental'
+        
+        return 'Unknown'
+    
     def parse_and_update(self, line, verbose=True):
         """Parse log line and update death stats if relevant."""
+        # First, check for damage events (both types)
+        player, damage, cause = self.extract_damage_info(line)
+        if player:
+            # Just store the damage cause, don't print yet
+            return False
+        
         # Pattern for player deaths
-        # Examples:
-        # "ACTION[Server]: player dies"
-        # "ACTION[Server]: player died"
-        death_pattern = r'ACTION\[Server\]: (\w+) die[sd]'
+        death_pattern = r'ACTION\[Server\]: (\w+) dies at'
         death_match = re.search(death_pattern, line)
         
         if death_match:
@@ -46,8 +153,11 @@ class MinetestDeathTracker:
             # Increment total deaths
             self.stats[player]['total_deaths'] += 1
             
-            # Try to extract cause of death if mentioned in the line
-            cause = self.extract_death_cause(line)
+            # Use the most recent damage cause for this player
+            if player in self.recent_damage:
+                cause = self.recent_damage[player]
+            else:
+                cause = 'Unknown'
             
             # Track death causes
             if cause in self.stats[player]['death_causes']:
@@ -66,29 +176,14 @@ class MinetestDeathTracker:
         
         return False
     
-    def extract_death_cause(self, line):
-        """Try to extract the cause of death from the log line."""
-        # Common death causes in Minetest
-        if 'fall' in line.lower() or 'fell' in line.lower():
-            return 'Fall Damage'
-        elif 'drown' in line.lower():
-            return 'Drowning'
-        elif 'lava' in line.lower():
-            return 'Lava'
-        elif 'fire' in line.lower() or 'burn' in line.lower():
-            return 'Fire'
-        elif 'mob' in line.lower() or 'killed by' in line.lower():
-            return 'Mob/Player'
-        elif 'suffocate' in line.lower() or 'suffocation' in line.lower():
-            return 'Suffocation'
-        else:
-            return 'Unknown'
-    
     def process_existing_log(self, clear_stats=False):
         """Process entire existing log file."""
         if clear_stats:
             self.stats = {}
             print("Cleared existing death stats.")
+        
+        # Reset recent damage tracking
+        self.recent_damage = {}
         
         print("Processing existing log: {}".format(self.log_file_path))
         print("Counting player deaths...")
