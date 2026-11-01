@@ -1,0 +1,4 @@
+# Example team list for hunt_stats.py --teams
+# One team per line:  Team name: player player player
+Red Team: abel eve
+Blue Team: pete chum

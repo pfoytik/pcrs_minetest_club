@@ -1,16 +1,23 @@
-# !/bin/bash
+#!/bin/bash
 
-cmd="sqlite3 players.sqlite"
+# Usage: PCRS_countItems.sh [world folder]   (default: current folder)
+WORLD="${1:-.}"
+DB="$WORLD/players.sqlite"
+if [ ! -f "$DB" ]; then
+	echo "No players.sqlite in $WORLD - pass the world folder, e.g. $0 ~/luanti/worlds/test_pcrs2026"
+	exit 1
+fi
+cmd="sqlite3 $DB"
 cmd1="select name from player;"
 result=$($cmd "$cmd1")
 echo $result
 
 declare -A team_players=(
-["team1"]="player1 2 3 4"
-["team2"]="5 6 7"
-["team3"]="8 9 10 11"
-["team4"]="12 13 14 15"
-["team5"]="16 17 18 19"
+["team1"]="Alura Ryland Ben Conner"
+["team2"]="Ashlyn Tyrus Declin"
+["team3"]="Maggie Kyden David Theo"
+["team4"]="Jadiel Eve Rylin Quin"
+["team5"]="Teddy Abel Lilly Skylar"
 )
 
 

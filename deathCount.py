@@ -384,10 +384,16 @@ class MinetestDeathTracker:
 
 # Usage
 if __name__ == "__main__":
-    # Replace with your actual log file path
-    LOG_FILE = "/path/to/minetest/debug.txt"
+    # Log file: 1st argument, else $LUANTI_LOG, else ../debug.txt (the Luanti folder)
+    import os, sys
+    LOG_FILE = (sys.argv[1] if len(sys.argv) > 1 else
+                os.environ.get("LUANTI_LOG",
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "debug.txt")))
+    LOG_FILE = os.path.abspath(LOG_FILE)
+    # Stats are saved next to the log, not in this (git-tracked) folder
+    STATS_FILE = os.path.join(os.path.dirname(LOG_FILE), "minetest_deaths.json")
     
-    tracker = MinetestDeathTracker(LOG_FILE)
+    tracker = MinetestDeathTracker(LOG_FILE, STATS_FILE)
     
     print("Minetest Death Tracker")
     print("=" * 50)
