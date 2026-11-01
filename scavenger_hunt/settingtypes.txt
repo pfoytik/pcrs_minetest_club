@@ -1,0 +1,24 @@
+# Chance (0 to 1) that each newly generated piece of land hides a Hunt Star.
+# Each piece is about 80x80 blocks. 0.5 means roughly one star per 110x110 area.
+scavenger_hunt.chance (Star chance per area) float 0.5 0 1
+
+# How many stars an area gets when it does get stars (1-50).
+# Raise this for a quick test or a treasure-packed world.
+scavenger_hunt.per_area (Stars per area) int 1 1 50
+
+# How often stars go on the floor of lakes and seas (at most 12 blocks deep).
+# 0 = never, 1 = a spot over water is used as often as a spot on land.
+scavenger_hunt.underwater (Underwater stars) float 0.5 0 1
+
+# Stars hidden in caves in each 80x80x80 underground section (0 = none).
+scavenger_hunt.caves_per_area (Cave stars per area) int 1 0 50
+
+# The deepest a cave star can be hidden (height, in blocks).
+scavenger_hunt.cave_min_y (Deepest cave star) int -80 -31000 31000
+
+# Hide stars automatically as new land is generated.
+# Turn off to only use /hunt_scatter and hand-placed stars.
+scavenger_hunt.mapgen (Hide stars in new land) bool true
+
+# Tell everyone in chat when someone finds a star.
+scavenger_hunt.announce (Announce finds to everyone) bool true
