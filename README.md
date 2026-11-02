@@ -58,8 +58,11 @@ the mod was installed have no placer, so they count for no team.
 bones box; they count again once the player digs the bones and has the stars
 back in their inventory. The report lists bones holding stars separately.
 
-Searching chests needs Python 3.14+ (built-in zstd). On older Python run
-`pip install zstandard`, or use `--no-map`.
+Searching chests needs a zstd decompressor. It uses the first one available:
+Python 3.14+'s built-in zstd, the `zstandard` package
+(`sudo apt install python3-zstandard`), or the system's `libzstd` (always
+present on Debian/Ubuntu). If none work, the report shows a warning and `-`
+for chests. Use `--no-map` to skip chests entirely.
 
 ## Scavenger Hunt remote control
 

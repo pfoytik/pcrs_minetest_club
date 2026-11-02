@@ -174,7 +174,40 @@ def get_decompressor():
         import zstandard  # older Python: pip install zstandard
         return lambda data: zstandard.ZstdDecompressor().decompressobj().decompress(data)
     except ImportError:
+        pass
+    return system_zstd()
+
+
+def system_zstd():
+    """Fallback for Python < 3.14 with no zstandard package: use the system's
+    libzstd (always present on Debian/Ubuntu - apt itself needs it)."""
+    import ctypes
+    import ctypes.util
+    name = ctypes.util.find_library("zstd")
+    try:
+        lib = ctypes.CDLL(name or "libzstd.so.1")
+    except OSError:
         return None
+    lib.ZSTD_decompress.restype = ctypes.c_size_t
+    lib.ZSTD_decompress.argtypes = [ctypes.c_void_p, ctypes.c_size_t,
+                                    ctypes.c_char_p, ctypes.c_size_t]
+    lib.ZSTD_isError.restype = ctypes.c_uint
+    lib.ZSTD_isError.argtypes = [ctypes.c_size_t]
+    lib.ZSTD_getErrorName.restype = ctypes.c_char_p
+    lib.ZSTD_getErrorName.argtypes = [ctypes.c_size_t]
+
+    def decompress(data):
+        size = 1 << 16  # a map block is usually ~20 KB unpacked
+        while True:
+            buf = ctypes.create_string_buffer(size)
+            n = lib.ZSTD_decompress(buf, size, data, len(data))
+            if not lib.ZSTD_isError(n):
+                return buf.raw[:n]
+            err = lib.ZSTD_getErrorName(n).decode()
+            if "too small" not in err.lower() or size >= 1 << 28:
+                raise ValueError("zstd: " + err)
+            size *= 4
+    return decompress
 
 
 class Reader:
@@ -259,8 +292,8 @@ def scan_map(world):
     """[(x, y, z, node name, owner, count)] for every container holding stars."""
     decompress = get_decompressor()
     if decompress is None:
-        print("(Can't search chests: this Python can't read the map. Use Python 3.14+, "
-              "or run: pip install zstandard)")
+        print("*** WARNING: can't search chests - this Python can't read the map. ***\n"
+              "*** Chest columns will show '-'. Fix: sudo apt install python3-zstandard ***")
         return None
     db = open_ro(os.path.join(world, "map.sqlite"))
     cols = [c[1] for c in db.execute("PRAGMA table_info(blocks)")]
@@ -408,6 +441,8 @@ def main():
                          ", ".join(members)))
         rows.sort(key=lambda r: (-r[4], -r[1]))
         table(["Team", "Found", "Carrying", "In chests", "Held now", "Members"], rows)
+        if containers is None:
+            print("(In chests '-' = chests were NOT searched; see the warning at the top.)")
         print("(Found = stars collected. Held now = stars the team has right now:\n"
               " carried by members + in chests a member placed. Stars in bones don't count.)")
         loose = sorted({n for _, n in ranking} | set(in_inventory) |
